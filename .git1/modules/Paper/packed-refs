@@ -1,0 +1,14 @@
+# pack-refs with: peeled fully-peeled sorted 
+64107df246aca773fe37f8fc09bf72a747bad20c refs/remotes/origin/chore/checkstyle
+ffa4118c810de414f385208e19137caa835b6452 refs/remotes/origin/conf/shared-random
+7f778ba63499b9501e1e17cdb9cc0d3bcefeff28 refs/remotes/origin/feat/PlayerMoveEvent-Vehicle-Improvement
+d929733f774a966382a8d9909684519dfb8057b5 refs/remotes/origin/feat/config-api
+59f43ad200dec49412dcb84576b3c77dd5addb8a refs/remotes/origin/fix/air-item-drop
+167c7d0313938507b09053dcb47de8334eba13ff refs/remotes/origin/fix/craftItemResult
+b1234bf0c101adf27d5d32ea84c24958ea70e522 refs/remotes/origin/fix/gen-circular-deps
+784a343c79f4000cd538f5f24cd7197ee44d1e69 refs/remotes/origin/generators
+00379977745888180532a86095c8935ff713ebd9 refs/remotes/origin/jd/getCustomModelData-deprecation
+a820bdaeb9923ebeeab42259fcb071b65e72ee58 refs/remotes/origin/main
+a838a886dcbc93664283034a41673e802a6b3098 refs/remotes/origin/ver/1.21.4
+70fe69cc213ba06d1575e683ecc452d70fedbb27 refs/tags/1.21.4
+^0767902699165a1cdb1977f555acbd8245de7c47

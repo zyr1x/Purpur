@@ -1,0 +1,6 @@
+# pack-refs with: peeled fully-peeled sorted 
+ece4a9129152b45cfa1255f7c78e4adbb3ef2e1d refs/remotes/origin/armorEvent
+e80c39fa6903d053be3a3b4ed8776f23e815058a refs/remotes/origin/debugging
+b2213d86807ad927d5a42c9982d161ec19602a12 refs/remotes/origin/experimental
+d6a05557dd5c82b22dec63af223b5eb29d8dd59c refs/remotes/origin/master
+558fdf5f54b0f527cd48903daf9368ac4b862876 refs/remotes/origin/version/1.12.2

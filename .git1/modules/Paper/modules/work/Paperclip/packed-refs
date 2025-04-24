@@ -1,0 +1,12 @@
+# pack-refs with: peeled fully-peeled sorted 
+f07f626d4ff10117e1622d5f6ff17e852e17f939 refs/remotes/origin/main
+9aa6139dc6883a2c71e7ab7ea00c194c9a3d30a1 refs/remotes/origin/manifest-meta
+6776c66987a021a1c0db55b2e21c883660acc19f refs/remotes/origin/master
+cd019d2e58ea8ed67edc6e0054685fabebfbda13 refs/tags/v2.0.0
+fce50e5789505300ea9b733762b9f6a68946988e refs/tags/v2.0.1
+971210a0409fc588561b9e8d3a2e66b123f0bbc5 refs/tags/v3.0.0
+a25115ceab43432ac2622a6dac0c0f27121775ff refs/tags/v3.0.1
+6985b8cd9397997f398e3dc121244f72a0e6e185 refs/tags/v3.0.2
+^219909da82608bc5961326bd7e308ab6315d2167
+a668a9d7c4f6211779ea0e2006eccb513e32fe72 refs/tags/v3.0.3
+^9f9f972dde0783762a70ce7bc70c35e6ebee5dbf
