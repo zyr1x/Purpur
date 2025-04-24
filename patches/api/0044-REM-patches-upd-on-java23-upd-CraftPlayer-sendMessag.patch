@@ -1,0 +1,45 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: i3w1s <nadejdinkostya@gmail.com>
+Date: Thu, 24 Apr 2025 14:39:38 +0300
+Subject: [PATCH] REM patches & upd on java23 & upd
+ CraftPlayer#sendMessage(...)
+
+
+diff --git a/.gitignore b/.gitignore
+deleted file mode 100644
+index e431e3435737e28394d81b56568a08b3c3148b9b..0000000000000000000000000000000000000000
+--- a/.gitignore
++++ /dev/null
+@@ -1,32 +0,0 @@
+-# Eclipse stuff
+-/.classpath
+-/.project
+-/.settings
+-
+-# netbeans
+-/nbproject
+-/nb-configuration.xml
+-
+-# we use maven!
+-/build.xml
+-
+-# maven
+-/target
+-
+-# vim
+-.*.sw[a-p]
+-
+-# various other potential build files
+-/build
+-/bin
+-/dist
+-/manifest.mf
+-
+-# Mac filesystem dust
+-.DS_Store
+-
+-# intellij
+-*.iml
+-*.ipr
+-*.iws
+-.idea/

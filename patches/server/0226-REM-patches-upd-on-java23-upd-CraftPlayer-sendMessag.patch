@@ -1,0 +1,996 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: i3w1s <nadejdinkostya@gmail.com>
+Date: Thu, 24 Apr 2025 14:38:15 +0300
+Subject: [PATCH] REM patches & upd on java23 & upd
+ CraftPlayer#sendMessage(...)
+
+
+diff --git a/pom.xml b/pom.xml
+index 3ef0a08b7a38040e43670d18dc6c5542f9fbb9bb..9b0d12d01d4a7df14f7e0f900852a170ba344715 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -8,14 +8,14 @@
+     <url>https://github.com/Spottedleaf/Tuinity</url>
+ 
+     <properties>
+-        <!-- <skipTests>true</skipTests> Paper - This [was] not going to end well -->
++        <skipTests>true</skipTests>
++        <maven.compiler.source>23</maven.compiler.source>
++        <maven.compiler.target>23</maven.compiler.target>
+         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+         <api.version>unknown</api.version>
+         <bt.name>git</bt.name>
+         <minecraft.version>1.16.5</minecraft.version>
+         <minecraft_version>1_16_R3</minecraft_version>
+-        <maven.compiler.source>1.8</maven.compiler.source>
+-        <maven.compiler.target>1.8</maven.compiler.target>
+     </properties>
+ 
+     <parent>
+@@ -52,13 +52,11 @@
+             <version>${project.version}</version>
+             <scope>compile</scope>
+         </dependency>
+-        <!-- Tuinity start - fix compile issue (cannot see new api) by moving netty include BEFORE server jar -->
+         <dependency>
+             <groupId>io.netty</groupId>
+             <artifactId>netty-all</artifactId>
+             <version>4.1.50.Final</version>
+         </dependency>
+-        <!-- Tuinity end - fix compile issue (cannot see new api) by moving netty include BEFORE server jar -->
+         <dependency>
+             <groupId>io.papermc</groupId>
+             <artifactId>minecraft-server</artifactId>
+@@ -107,7 +105,7 @@
+         <dependency>
+             <groupId>org.ow2.asm</groupId>
+             <artifactId>asm</artifactId>
+-            <version>9.1</version>
++            <version>9.8</version>
+             <scope>compile</scope>
+         </dependency>
+         <dependency>
+@@ -189,11 +187,11 @@
+             <scope>test</scope>
+         </dependency>
+         <!-- for optimized protocol handling -->
++        <!-- https://mvnrepository.com/artifact/com.velocitypowered/velocity-native -->
+         <dependency>
+             <groupId>com.velocitypowered</groupId>
+             <artifactId>velocity-native</artifactId>
+-            <version>1.1.0-SNAPSHOT</version>
+-            <scope>compile</scope>
++            <version>3.4.0-SNAPSHOT</version>
+         </dependency>
+     </dependencies>
+ 
+diff --git a/src/main/java/io/papermc/paper/adventure/AdventureComponent.java b/src/main/java/io/papermc/paper/adventure/AdventureComponent.java
+index 89597b4a3064c3c6001c7e927a848ee73a1b1fd9..b8e8db950b0982a6cb3d12815852b7864a39c002 100644
+--- a/src/main/java/io/papermc/paper/adventure/AdventureComponent.java
++++ b/src/main/java/io/papermc/paper/adventure/AdventureComponent.java
+@@ -7,15 +7,14 @@ import java.lang.reflect.Type;
+ import java.util.List;
+ import net.kyori.adventure.text.Component;
+ import net.kyori.adventure.text.TextComponent;
++import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+ import net.minecraft.network.chat.ChatModifier;
+ import net.minecraft.network.chat.IChatBaseComponent;
+ import net.minecraft.network.chat.IChatMutableComponent;
+-import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
+-import org.checkerframework.checker.nullness.qual.Nullable;
+ 
+ public final class AdventureComponent implements IChatBaseComponent {
+     final Component wrapped;
+-    private @MonotonicNonNull IChatBaseComponent converted;
++    private IChatBaseComponent converted;
+ 
+     public AdventureComponent(final Component wrapped) {
+         this.wrapped = wrapped;
+@@ -30,7 +29,7 @@ public final class AdventureComponent implements IChatBaseComponent {
+         return converted;
+     }
+ 
+-    public @Nullable IChatBaseComponent deepConvertedIfPresent() {
++    public IChatBaseComponent deepConvertedIfPresent() {
+         return this.converted;
+     }
+ 
+@@ -50,7 +49,7 @@ public final class AdventureComponent implements IChatBaseComponent {
+ 
+     @Override
+     public String getString() {
+-        return PaperAdventure.PLAIN.serialize(this.wrapped);
++        return PlainTextComponentSerializer.plainText().serialize(this.wrapped);
+     }
+ 
+     @Override
+diff --git a/src/main/java/io/papermc/paper/adventure/ChatProcessor.java b/src/main/java/io/papermc/paper/adventure/ChatProcessor.java
+index 1fcb01abc93c3c6ad172f209f55421d8b98629d5..a3b9a4a81ea7929a1f5263e00b73564b4082bac7 100644
+--- a/src/main/java/io/papermc/paper/adventure/ChatProcessor.java
++++ b/src/main/java/io/papermc/paper/adventure/ChatProcessor.java
+@@ -10,7 +10,6 @@ import java.util.function.Consumer;
+ import java.util.regex.Pattern;
+ 
+ import net.kyori.adventure.audience.Audience;
+-import net.kyori.adventure.audience.MessageType;
+ import net.kyori.adventure.text.Component;
+ import net.kyori.adventure.text.TextReplacementConfig;
+ import net.kyori.adventure.text.event.ClickEvent;
+@@ -164,18 +163,18 @@ public final class ChatProcessor {
+         if (viewers instanceof LazyChatAudienceSet && recipients instanceof LazyPlayerSet &&
+             (!((LazyChatAudienceSet) viewers).isLazy() || ((LazyPlayerSet) recipients).isLazy())) {
+             for (final Audience viewer : viewers) {
+-                viewer.sendMessage(player, renderer.render(player, displayName, message, viewer), MessageType.CHAT);
++                viewer.sendMessage(renderer.render(player, displayName, message, viewer));
+             }
+         } else {
+-            this.server.console.sendMessage(player, renderer.render(player, displayName, message, this.server.console), MessageType.CHAT);
++            this.server.console.sendMessage(renderer.render(player, displayName, message, this.server.console));
+             for (final Player recipient : recipients) {
+-                recipient.sendMessage(player, renderer.render(player, displayName, message, recipient), MessageType.CHAT);
++                recipient.sendMessage(renderer.render(player, displayName, message, recipient));
+             }
+         }
+     }
+ 
+     private AsyncChatEvent createAsync(final ChatRenderer renderer, final Set<Player> recipients, final Set<Audience> viewers, final Component message) {
+-        return new AsyncChatEvent(this.async, this.player.getBukkitEntity(), recipients, viewers, renderer, message, this.originalMessage);
++        return new AsyncChatEvent(this.async, this.player.getBukkitEntity(), viewers, renderer, message, this.originalMessage);
+     }
+ 
+     private ChatEvent createSync(final ChatRenderer renderer, final Set<Player> recipients, final Set<Audience> viewers, final Component message) {
+diff --git a/src/main/java/io/papermc/paper/adventure/PaperAdventure.java b/src/main/java/io/papermc/paper/adventure/PaperAdventure.java
+index 822ffa8e4b554fd6aa7ce1b2bb68c198c863d86c..6e07769b4cb446f105f90a6608df5b0edea4536e 100644
+--- a/src/main/java/io/papermc/paper/adventure/PaperAdventure.java
++++ b/src/main/java/io/papermc/paper/adventure/PaperAdventure.java
+@@ -20,6 +20,7 @@ import net.kyori.adventure.text.format.TextColor;
+ import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
+ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+ import net.kyori.adventure.text.serializer.plain.PlainComponentSerializer;
++import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+ import net.kyori.adventure.translation.GlobalTranslator;
+ import net.kyori.adventure.util.Codec;
+ import net.minecraft.EnumChatFormat;
+@@ -34,15 +35,14 @@ import net.minecraft.sounds.SoundCategory;
+ import net.minecraft.world.BossBattle;
+ import net.minecraft.world.item.ItemStack;
+ import org.bukkit.ChatColor;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+-import org.checkerframework.checker.nullness.qual.Nullable;
++import org.jetbrains.annotations.Nullable;
+ 
+ public final class PaperAdventure {
+     public static final AttributeKey<Locale> LOCALE_ATTRIBUTE = AttributeKey.valueOf("adventure:locale");
+     private static final Pattern LOCALIZATION_PATTERN = Pattern.compile("%(?:(\\d+)\\$)?s");
+     public static final ComponentFlattener FLATTENER = ComponentFlattener.basic().toBuilder()
+         .complexMapper(TranslatableComponent.class, (translatable, consumer) -> {
+-            final @NonNull String translated = LocaleLanguage.a().a(translatable.key());
++            final String translated = LocaleLanguage.a().a(translatable.key());
+ 
+             final Matcher matcher = LOCALIZATION_PATTERN.matcher(translated);
+             final List<Component> args = translatable.args();
+@@ -55,7 +55,7 @@ public final class PaperAdventure {
+                 }
+                 lastIdx = matcher.end();
+ 
+-                final @Nullable String argIdx = matcher.group(1);
++                final String argIdx = matcher.group(1);
+                 // calculate argument position
+                 if (argIdx != null) {
+                     try {
+@@ -80,19 +80,20 @@ public final class PaperAdventure {
+             }
+         })
+         .build();
++
+     public static final LegacyComponentSerializer LEGACY_SECTION_UXRC = LegacyComponentSerializer.builder().flattener(FLATTENER).hexColors().useUnusualXRepeatedCharacterHexFormat().build();
+     public static final LegacyComponentSerializer LEGACY_AMPERSAND = LegacyComponentSerializer.builder().character(LegacyComponentSerializer.AMPERSAND_CHAR).hexColors().build(); // Purpur
+-    public static final PlainComponentSerializer PLAIN = PlainComponentSerializer.builder().flattener(FLATTENER).build();
++    public static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.builder().flattener(FLATTENER).build();
+     public static final GsonComponentSerializer GSON = GsonComponentSerializer.builder()
+-        .legacyHoverEventSerializer(NBTLegacyHoverEventSerializer.INSTANCE)
+-        .build();
++            .legacyHoverEventSerializer((net.kyori.adventure.text.serializer.json.@Nullable LegacyHoverEventSerializer) NBTLegacyHoverEventSerializer.INSTANCE)
++            .build();
+     public static final GsonComponentSerializer COLOR_DOWNSAMPLING_GSON = GsonComponentSerializer.builder()
+-        .legacyHoverEventSerializer(NBTLegacyHoverEventSerializer.INSTANCE)
++        .legacyHoverEventSerializer((net.kyori.adventure.text.serializer.json.@Nullable LegacyHoverEventSerializer) NBTLegacyHoverEventSerializer.INSTANCE)
+         .downsampleColors()
+         .build();
+     private static final Codec<NBTTagCompound, String, IOException, IOException> NBT_CODEC = new Codec<NBTTagCompound, String, IOException, IOException>() {
+         @Override
+-        public @NonNull NBTTagCompound decode(final @NonNull String encoded) throws IOException {
++        public NBTTagCompound decode(final String encoded) throws IOException {
+             try {
+                 return MojangsonParser.parse(encoded);
+             } catch (final CommandSyntaxException e) {
+@@ -101,7 +102,7 @@ public final class PaperAdventure {
+         }
+ 
+         @Override
+-        public @NonNull String encode(final @NonNull NBTTagCompound decoded) {
++        public String encode(final NBTTagCompound decoded) {
+             return decoded.toString();
+         }
+     };
+@@ -332,7 +333,7 @@ public final class PaperAdventure {
+ 
+     // Colors
+ 
+-    public static @NonNull TextColor asAdventure(EnumChatFormat minecraftColor) {
++    public static TextColor asAdventure(EnumChatFormat minecraftColor) {
+         if (minecraftColor.e() == null) {
+             throw new IllegalArgumentException("Not a valid color");
+         }
+diff --git a/src/main/java/io/papermc/paper/adventure/VanillaBossBarListener.java b/src/main/java/io/papermc/paper/adventure/VanillaBossBarListener.java
+index 3a4158781e464d9a860bab72ed719a41929c8add..ecd1955dffd093ae51a45ed98182892ac6b88535 100644
+--- a/src/main/java/io/papermc/paper/adventure/VanillaBossBarListener.java
++++ b/src/main/java/io/papermc/paper/adventure/VanillaBossBarListener.java
+@@ -5,7 +5,6 @@ import java.util.function.Consumer;
+ import net.kyori.adventure.bossbar.BossBar;
+ import net.kyori.adventure.text.Component;
+ import net.minecraft.network.protocol.game.PacketPlayOutBoss;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ 
+ public final class VanillaBossBarListener implements BossBar.Listener {
+     private final Consumer<PacketPlayOutBoss.Action> action;
+@@ -15,27 +14,27 @@ public final class VanillaBossBarListener implements BossBar.Listener {
+     }
+ 
+     @Override
+-    public void bossBarNameChanged(final @NonNull BossBar bar, final @NonNull Component oldName, final @NonNull Component newName) {
++    public void bossBarNameChanged(final BossBar bar, final Component oldName, final Component newName) {
+         this.action.accept(PacketPlayOutBoss.Action.UPDATE_NAME);
+     }
+ 
+     @Override
+-    public void bossBarProgressChanged(final @NonNull BossBar bar, final float oldProgress, final float newProgress) {
++    public void bossBarProgressChanged(final BossBar bar, final float oldProgress, final float newProgress) {
+         this.action.accept(PacketPlayOutBoss.Action.UPDATE_PCT);
+     }
+ 
+     @Override
+-    public void bossBarColorChanged(final @NonNull BossBar bar, final BossBar.@NonNull Color oldColor, final BossBar.@NonNull Color newColor) {
++    public void bossBarColorChanged(final BossBar bar, final BossBar.Color oldColor, final BossBar.Color newColor) {
+         this.action.accept(PacketPlayOutBoss.Action.UPDATE_STYLE);
+     }
+ 
+     @Override
+-    public void bossBarOverlayChanged(final @NonNull BossBar bar, final BossBar.@NonNull Overlay oldOverlay, final BossBar.@NonNull Overlay newOverlay) {
++    public void bossBarOverlayChanged(final BossBar bar, final BossBar.Overlay oldOverlay, final BossBar.Overlay newOverlay) {
+         this.action.accept(PacketPlayOutBoss.Action.UPDATE_STYLE);
+     }
+ 
+     @Override
+-    public void bossBarFlagsChanged(final @NonNull BossBar bar, final @NonNull Set<BossBar.Flag> flagsAdded, final @NonNull Set<BossBar.Flag> flagsRemoved) {
++    public void bossBarFlagsChanged(final BossBar bar, final Set<BossBar.Flag> flagsAdded, final Set<BossBar.Flag> flagsRemoved) {
+         this.action.accept(PacketPlayOutBoss.Action.UPDATE_PROPERTIES);
+     }
+ }
+diff --git a/src/main/java/io/papermc/paper/brigadier/PaperBrigadierProviderImpl.java b/src/main/java/io/papermc/paper/brigadier/PaperBrigadierProviderImpl.java
+index fb1d6632788ae886b7a0e56fb490920c6ba2ce22..f87f184bfa89f5971e81e900da49518b033ed28b 100644
+--- a/src/main/java/io/papermc/paper/brigadier/PaperBrigadierProviderImpl.java
++++ b/src/main/java/io/papermc/paper/brigadier/PaperBrigadierProviderImpl.java
+@@ -5,7 +5,6 @@ import io.papermc.paper.adventure.PaperAdventure;
+ import net.kyori.adventure.text.Component;
+ import net.kyori.adventure.text.ComponentLike;
+ import net.minecraft.network.chat.ChatComponentUtils;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ 
+ import static java.util.Objects.requireNonNull;
+ 
+@@ -17,13 +16,13 @@ public enum PaperBrigadierProviderImpl implements PaperBrigadierProvider {
+     }
+ 
+     @Override
+-    public @NonNull Message message(final @NonNull ComponentLike componentLike) {
++    public Message message(final ComponentLike componentLike) {
+         requireNonNull(componentLike, "componentLike");
+         return PaperAdventure.asVanilla(componentLike.asComponent());
+     }
+ 
+     @Override
+-    public @NonNull Component componentFromMessage(final @NonNull Message message) {
++    public Component componentFromMessage(final Message message) {
+         requireNonNull(message, "message");
+         return PaperAdventure.asAdventure(ChatComponentUtils.fromMessage(message));
+     }
+diff --git a/src/main/java/io/papermc/paper/console/BrigadierCommandCompleter.java b/src/main/java/io/papermc/paper/console/BrigadierCommandCompleter.java
+index edd231d95a04a1c4832f1ca8a3da6a56e9472ca1..fb52792699495cf66c7a1154e917445e2dc4dc79 100644
+--- a/src/main/java/io/papermc/paper/console/BrigadierCommandCompleter.java
++++ b/src/main/java/io/papermc/paper/console/BrigadierCommandCompleter.java
+@@ -9,7 +9,6 @@ import io.papermc.paper.adventure.PaperAdventure;
+ import net.minecraft.commands.CommandListenerWrapper;
+ import net.minecraft.network.chat.ChatComponentUtils;
+ import net.minecraft.server.dedicated.DedicatedServer;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ import org.jline.reader.Candidate;
+ import org.jline.reader.LineReader;
+ import org.jline.reader.ParsedLine;
+@@ -24,12 +23,12 @@ public final class BrigadierCommandCompleter {
+     private final CommandListenerWrapper commandSourceStack;
+     private final DedicatedServer server;
+ 
+-    public BrigadierCommandCompleter(final @NonNull DedicatedServer server, final @NonNull CommandListenerWrapper commandSourceStack) {
++    public BrigadierCommandCompleter(final DedicatedServer server, final CommandListenerWrapper commandSourceStack) {
+         this.server = server;
+         this.commandSourceStack = commandSourceStack;
+     }
+ 
+-    public void complete(final @NonNull LineReader reader, final @NonNull ParsedLine line, final @NonNull List<Candidate> candidates, final @NonNull List<Completion> existing) {
++    public void complete(final LineReader reader, final ParsedLine line, final List<Candidate> candidates, final List<Completion> existing) {
+         if (!com.destroystokyo.paper.PaperConfig.enableBrigadierConsoleCompletions) {
+             this.addCandidates(candidates, Collections.emptyList(), existing);
+             return;
+@@ -44,9 +43,9 @@ public final class BrigadierCommandCompleter {
+     }
+ 
+     private void addCandidates(
+-        final @NonNull List<Candidate> candidates,
+-        final @NonNull List<Suggestion> brigSuggestions,
+-        final @NonNull List<Completion> existing
++        final List<Candidate> candidates,
++        final List<Suggestion> brigSuggestions,
++        final List<Completion> existing
+     ) {
+         final List<Completion> completions = new ArrayList<>();
+         brigSuggestions.forEach(it -> completions.add(toCompletion(it)));
+@@ -64,7 +63,7 @@ public final class BrigadierCommandCompleter {
+         }
+     }
+ 
+-    private static @NonNull Candidate toCandidate(final @NonNull Completion completion) {
++    private static Candidate toCandidate(final Completion completion) {
+         final String suggestionText = completion.suggestion();
+         final String suggestionTooltip = PaperAdventure.PLAIN.serializeOr(completion.tooltip(), null);
+         return new Candidate(
+@@ -78,14 +77,14 @@ public final class BrigadierCommandCompleter {
+         );
+     }
+ 
+-    private static @NonNull Completion toCompletion(final @NonNull Suggestion suggestion) {
++    private static Completion toCompletion(final Suggestion suggestion) {
+         if (suggestion.getTooltip() == null) {
+             return completion(suggestion.getText());
+         }
+         return completion(suggestion.getText(), PaperAdventure.asAdventure(ChatComponentUtils.fromMessage(suggestion.getTooltip())));
+     }
+ 
+-    static @NonNull StringReader prepareStringReader(final @NonNull String line) {
++    static StringReader prepareStringReader(final String line) {
+         final StringReader stringReader = new StringReader(line);
+         if (stringReader.canRead() && stringReader.peek() == '/') {
+             stringReader.skip();
+diff --git a/src/main/java/io/papermc/paper/console/BrigadierCommandHighlighter.java b/src/main/java/io/papermc/paper/console/BrigadierCommandHighlighter.java
+index d51d20a6d1c0c956cdf425503a6c1401acd9c854..a73fc167d9463d3ab8ac24b7ff303e659414a986 100644
+--- a/src/main/java/io/papermc/paper/console/BrigadierCommandHighlighter.java
++++ b/src/main/java/io/papermc/paper/console/BrigadierCommandHighlighter.java
+@@ -5,7 +5,6 @@ import com.mojang.brigadier.context.ParsedCommandNode;
+ import com.mojang.brigadier.tree.LiteralCommandNode;
+ import net.minecraft.commands.CommandListenerWrapper;
+ import net.minecraft.server.dedicated.DedicatedServer;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ import org.jline.reader.Highlighter;
+ import org.jline.reader.LineReader;
+ import org.jline.utils.AttributedString;
+@@ -17,13 +16,13 @@ public final class BrigadierCommandHighlighter implements Highlighter {
+     private final CommandListenerWrapper commandSourceStack;
+     private final DedicatedServer server;
+ 
+-    public BrigadierCommandHighlighter(final @NonNull DedicatedServer server, final @NonNull CommandListenerWrapper commandSourceStack) {
++    public BrigadierCommandHighlighter(final DedicatedServer server, final CommandListenerWrapper commandSourceStack) {
+         this.server = server;
+         this.commandSourceStack = commandSourceStack;
+     }
+ 
+     @Override
+-    public AttributedString highlight(final @NonNull LineReader reader, final @NonNull String buffer) {
++    public AttributedString highlight(final LineReader reader, final String buffer) {
+         final AttributedStringBuilder builder = new AttributedStringBuilder();
+         final ParseResults<CommandListenerWrapper> results = this.server.getCommandDispatcher().dispatcher().parse(BrigadierCommandCompleter.prepareStringReader(buffer), this.commandSourceStack);
+         int pos = 0;
+diff --git a/src/main/java/io/papermc/paper/network/ChannelInitializeListener.java b/src/main/java/io/papermc/paper/network/ChannelInitializeListener.java
+index 88099df34c2d74daba9645aadf65b446ca795a91..446d91366f893ea108f759f57f0abb7162043a61 100644
+--- a/src/main/java/io/papermc/paper/network/ChannelInitializeListener.java
++++ b/src/main/java/io/papermc/paper/network/ChannelInitializeListener.java
+@@ -1,7 +1,6 @@
+ package io.papermc.paper.network;
+ 
+ import io.netty.channel.Channel;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ 
+ /**
+  * Internal API to register channel initialization listeners.
+@@ -11,5 +10,5 @@ import org.checkerframework.checker.nullness.qual.NonNull;
+ @FunctionalInterface
+ public interface ChannelInitializeListener {
+ 
+-    void afterInitChannel(@NonNull Channel channel);
++    void afterInitChannel(Channel channel);
+ }
+diff --git a/src/main/java/io/papermc/paper/network/ChannelInitializeListenerHolder.java b/src/main/java/io/papermc/paper/network/ChannelInitializeListenerHolder.java
+index 30e62719e0a83525daa33cf41cb61df360c0e046..81bd7edb536a8da2bb88b45d7e3cd8c04e8bddf6 100644
+--- a/src/main/java/io/papermc/paper/network/ChannelInitializeListenerHolder.java
++++ b/src/main/java/io/papermc/paper/network/ChannelInitializeListenerHolder.java
+@@ -2,8 +2,6 @@ package io.papermc.paper.network;
+ 
+ import io.netty.channel.Channel;
+ import net.kyori.adventure.key.Key;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+-import org.checkerframework.checker.nullness.qual.Nullable;
+ 
+ import java.util.Collections;
+ import java.util.HashMap;
+@@ -28,7 +26,7 @@ public final class ChannelInitializeListenerHolder {
+      * @param key key
+      * @return whether an initialization listener is registered under the given key
+      */
+-    public static boolean hasListener(@NonNull Key key) {
++    public static boolean hasListener(Key key) {
+         return LISTENERS.containsKey(key);
+     }
+ 
+@@ -38,7 +36,7 @@ public final class ChannelInitializeListenerHolder {
+      * @param key      key
+      * @param listener initialization listeners
+      */
+-    public static void addListener(@NonNull Key key, @NonNull ChannelInitializeListener listener) {
++    public static void addListener(Key key, ChannelInitializeListener listener) {
+         LISTENERS.put(key, listener);
+     }
+ 
+@@ -48,7 +46,7 @@ public final class ChannelInitializeListenerHolder {
+      * @param key key
+      * @return removed initialization listener if present
+      */
+-    public static @Nullable ChannelInitializeListener removeListener(@NonNull Key key) {
++    public static ChannelInitializeListener removeListener(Key key) {
+         return LISTENERS.remove(key);
+     }
+ 
+@@ -57,7 +55,7 @@ public final class ChannelInitializeListenerHolder {
+      *
+      * @return immutable map of registered initialization listeners
+      */
+-    public static @NonNull Map<Key, ChannelInitializeListener> getListeners() {
++    public static Map<Key, ChannelInitializeListener> getListeners() {
+         return IMMUTABLE_VIEW;
+     }
+ 
+@@ -66,7 +64,7 @@ public final class ChannelInitializeListenerHolder {
+      *
+      * @param channel channel
+      */
+-    public static void callListeners(@NonNull Channel channel) {
++    public static void callListeners(Channel channel) {
+         for (ChannelInitializeListener listener : LISTENERS.values()) {
+             listener.afterInitChannel(channel);
+         }
+diff --git a/src/main/java/net/minecraft/network/chat/ChatComponentUtils.java b/src/main/java/net/minecraft/network/chat/ChatComponentUtils.java
+index d14e4bf09bc43e78a9da07ea062ed886d27c7cc0..814cbf3a1ad53a61d6cb4a6e1614455a1fa24397 100644
+--- a/src/main/java/net/minecraft/network/chat/ChatComponentUtils.java
++++ b/src/main/java/net/minecraft/network/chat/ChatComponentUtils.java
+@@ -108,7 +108,7 @@ public class ChatComponentUtils {
+         return new ChatMessage("chat.square_brackets", new Object[]{ichatbasecomponent});
+     }
+ 
+-    public static IChatBaseComponent a(Message message) { return fromMessage(message); } public static IChatBaseComponent fromMessage(final @org.checkerframework.checker.nullness.qual.NonNull Message message) { // Paper - OBFHELPER
++    public static IChatBaseComponent a(Message message) { return fromMessage(message); } public static IChatBaseComponent fromMessage(final Message message) { // Paper - OBFHELPER
+         return (IChatBaseComponent) (message instanceof IChatBaseComponent ? (IChatBaseComponent) message : new ChatComponentText(message.getString()));
+     }
+ }
+diff --git a/src/main/java/net/minecraft/server/AdvancementDataPlayer.java b/src/main/java/net/minecraft/server/AdvancementDataPlayer.java
+index 4720644ae82f76f835f14c0b3a00e7b7874fb1e2..ff971e3211dfe3e08eab42322cc4b5e7026f36f0 100644
+--- a/src/main/java/net/minecraft/server/AdvancementDataPlayer.java
++++ b/src/main/java/net/minecraft/server/AdvancementDataPlayer.java
+@@ -316,8 +316,7 @@ public class AdvancementDataPlayer {
+             flag = true;
+             if (!flag1 && advancementprogress.isDone()) {
+                 // Paper start - Add Adventure message to PlayerAdvancementDoneEvent
+-                boolean announceToChat = advancement.getAdvancementDisplay() != null && advancement.getAdvancementDisplay().shouldAnnounceToChat();
+-                net.kyori.adventure.text.Component message = announceToChat ? PaperAdventure.asAdventure(new ChatMessage("chat.type.advancement." + advancement.getAdvancementDisplay().getFrameType().getId(), this.player.getScoreboardDisplayName(), advancement.getChatComponent())) : null;
++                net.kyori.adventure.text.Component message = null;
+                 org.bukkit.event.player.PlayerAdvancementDoneEvent event = new org.bukkit.event.player.PlayerAdvancementDoneEvent(this.player.getBukkitEntity(), advancement.bukkit, message);
+                 this.player.world.getServer().getPluginManager().callEvent(event);
+                 message = event.message();
+diff --git a/src/main/java/net/minecraft/server/network/PlayerConnection.java b/src/main/java/net/minecraft/server/network/PlayerConnection.java
+index d1b708da030326cf22b678df8151536fc13afe00..bdc63bbaab67140ec11274131d376f5a15e29518 100644
+--- a/src/main/java/net/minecraft/server/network/PlayerConnection.java
++++ b/src/main/java/net/minecraft/server/network/PlayerConnection.java
+@@ -150,7 +150,6 @@ import net.minecraft.world.level.block.entity.TileEntityCommand;
+ import net.minecraft.world.level.block.entity.TileEntityJigsaw;
+ import net.minecraft.world.level.block.entity.TileEntitySign;
+ import net.minecraft.world.level.block.entity.TileEntityStructure;
+-import net.minecraft.world.level.block.state.BlockBase;
+ import net.minecraft.world.level.block.state.IBlockData;
+ import net.minecraft.world.phys.AxisAlignedBB;
+ import net.minecraft.world.phys.MovingObjectPositionBlock;
+@@ -183,7 +182,6 @@ import org.bukkit.Location;
+ import org.bukkit.craftbukkit.entity.CraftPlayer;
+ import org.bukkit.craftbukkit.event.CraftEventFactory;
+ import org.bukkit.craftbukkit.inventory.CraftItemStack;
+-import org.bukkit.craftbukkit.util.CraftChatMessage;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.craftbukkit.util.LazyPlayerSet;
+ import org.bukkit.craftbukkit.util.Waitable;
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 1f6a84566e8bd2df866fd4c166a0e1874bb1e4bb..487d65d207e637ec8a675c9681f72a94ac2c1f05 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -20,6 +20,8 @@ import java.util.Optional;
+ import java.util.Set;
+ import java.util.UUID;
+ import javax.annotation.Nullable;
++
++import net.kyori.adventure.text.Component;
+ import net.minecraft.EnumChatFormat;
+ import net.minecraft.SystemUtils;
+ import net.minecraft.core.BaseBlockPosition;
+@@ -353,7 +355,7 @@ public abstract class PlayerList {
+         mountSavedVehicle(entityplayer, worldserver1, nbttagcompound);
+         // Paper end
+         // CraftBukkit start
+-        PlayerJoinEvent playerJoinEvent = new org.bukkit.event.player.PlayerJoinEvent(cserver.getPlayer(entityplayer), PaperAdventure.asAdventure(chatmessage)); // Paper - Adventure
++        PlayerJoinEvent playerJoinEvent = new org.bukkit.event.player.PlayerJoinEvent(cserver.getPlayer(entityplayer), Component.empty()); // Paper - Adventure
+         cserver.getPluginManager().callEvent(playerJoinEvent);
+ 
+         if (!entityplayer.playerConnection.networkManager.isConnected()) {
+@@ -594,7 +596,7 @@ public abstract class PlayerList {
+             entityplayer.closeInventory(org.bukkit.event.inventory.InventoryCloseEvent.Reason.DISCONNECT); // Paper
+         }
+ 
+-        PlayerQuitEvent playerQuitEvent = new PlayerQuitEvent(cserver.getPlayer(entityplayer), net.kyori.adventure.text.Component.translatable("multiplayer.player.left", net.kyori.adventure.text.format.NamedTextColor.YELLOW, com.destroystokyo.paper.PaperConfig.useDisplayNameInQuit ? entityplayer.getBukkitEntity().displayName() : net.kyori.adventure.text.Component.text(entityplayer.getName())), entityplayer.quitReason); // Paper - quit reason
++        PlayerQuitEvent playerQuitEvent = new PlayerQuitEvent(cserver.getPlayer(entityplayer), Component.empty(), entityplayer.quitReason); // Paper - quit reason
+         if (entityplayer.didPlayerJoinEvent) cserver.getPluginManager().callEvent(playerQuitEvent); // Paper - if we disconnected before join ever fired, don't fire quit
+         entityplayer.getBukkitEntity().disconnect(playerQuitEvent.getQuitMessage());
+ 
+diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
+index 81ceeff37f7e03eead177cbd49f79a74be3aeeb2..71549c67e52b883bbffb7a783540cfbc6e236d9a 100644
+--- a/src/main/java/net/minecraft/world/item/ItemStack.java
++++ b/src/main/java/net/minecraft/world/item/ItemStack.java
+@@ -9,7 +9,6 @@ import com.mojang.serialization.Codec;
+ import com.mojang.serialization.codecs.RecordCodecBuilder;
+ import java.text.DecimalFormat;
+ import java.text.DecimalFormatSymbols;
+-import java.util.Collections;
+ import java.util.Comparator;
+ import java.util.Locale;
+ import java.util.Objects;
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftCrashReport.java b/src/main/java/org/bukkit/craftbukkit/CraftCrashReport.java
+index a6736d15282715d920bab85eb92074cd2b4f57d6..718aa7da15a6a051b1c142a78f12051e04cda222 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftCrashReport.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftCrashReport.java
+@@ -8,7 +8,6 @@ import java.util.Map;
+ import net.minecraft.CrashReportCallable;
+ import net.minecraft.server.MinecraftServer;
+ import org.bukkit.Bukkit;
+-import org.bukkit.Chunk;
+ import org.bukkit.World;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.plugin.Plugin;
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftServer.java b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+index e9d6c38a042195dae44109706cf5710e7ac3d316..a270cf13e7fba7ecfdaa456ac912845812d04b29 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftServer.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftServer.java
+@@ -4,7 +4,6 @@ import com.google.common.base.Charsets;
+ import com.google.common.base.Function;
+ import com.google.common.base.Preconditions;
+ import com.google.common.collect.ImmutableList;
+-import com.google.common.collect.ImmutableSet;
+ import com.google.common.collect.Iterators;
+ import com.google.common.collect.Lists;
+ import com.google.common.collect.MapMaker;
+@@ -106,21 +105,9 @@ import net.minecraft.world.level.storage.WorldNBTStorage;
+ import net.minecraft.world.level.storage.loot.LootTableRegistry;
+ import net.minecraft.world.phys.Vec3D;
+ import org.apache.commons.lang.Validate;
+-import org.bukkit.BanList;
+-import org.bukkit.Bukkit;
+-import org.bukkit.ChatColor;
+-import org.bukkit.GameMode;
+-import org.bukkit.Keyed;
+-import org.bukkit.Location;
+-import org.bukkit.NamespacedKey;
+-import org.bukkit.OfflinePlayer;
+-import org.bukkit.Server;
+-import org.bukkit.StructureType;
+-import org.bukkit.UnsafeValues;
++import org.bukkit.*;
+ import org.bukkit.Warning.WarningState;
+-import org.bukkit.World;
+ import org.bukkit.World.Environment;
+-import org.bukkit.WorldCreator;
+ import org.bukkit.block.data.BlockData;
+ import org.bukkit.boss.BarColor;
+ import org.bukkit.boss.BarFlag;
+@@ -170,12 +157,7 @@ import org.bukkit.craftbukkit.scoreboard.CraftScoreboardManager;
+ import org.bukkit.craftbukkit.tag.CraftBlockTag;
+ import org.bukkit.craftbukkit.tag.CraftFluidTag;
+ import org.bukkit.craftbukkit.tag.CraftItemTag;
+-import org.bukkit.craftbukkit.util.CraftChatMessage;
+-import org.bukkit.craftbukkit.util.CraftIconCache;
+-import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+-import org.bukkit.craftbukkit.util.CraftNamespacedKey;
+-import org.bukkit.craftbukkit.util.DatFileFilter;
+-import org.bukkit.craftbukkit.util.Versioning;
++import org.bukkit.craftbukkit.util.*;
+ import org.bukkit.craftbukkit.util.permissions.CraftDefaultPermissions;
+ import org.bukkit.entity.Entity;
+ import org.bukkit.entity.Player;
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+index 3562c20dee06913d03aee49d12cb27831c008842..6ec5e872c37237f5fc4b4ee07497b536d34c411a 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+@@ -109,7 +109,6 @@ import org.bukkit.Sound;
+ import org.bukkit.StructureType;
+ import org.bukkit.TreeType;
+ import org.bukkit.World;
+-import org.bukkit.World.Environment;
+ import org.bukkit.WorldBorder;
+ import org.bukkit.block.Biome;
+ import org.bukkit.block.Block;
+@@ -118,7 +117,6 @@ import org.bukkit.block.BlockState;
+ import org.bukkit.block.data.BlockData;
+ import org.bukkit.boss.DragonBattle;
+ import org.bukkit.craftbukkit.block.CraftBlock;
+-import org.bukkit.craftbukkit.block.CraftBlockState;
+ import org.bukkit.craftbukkit.block.data.CraftBlockData;
+ import org.bukkit.craftbukkit.boss.CraftDragonBattle;
+ import org.bukkit.craftbukkit.entity.CraftEntity;
+@@ -253,7 +251,6 @@ import org.bukkit.entity.minecart.PoweredMinecart;
+ import org.bukkit.entity.minecart.SpawnerMinecart;
+ import org.bukkit.entity.minecart.StorageMinecart;
+ import org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason;
+-import org.bukkit.event.world.SpawnChangeEvent;
+ import org.bukkit.event.world.TimeSkipEvent;
+ import org.bukkit.generator.BlockPopulator;
+ import org.bukkit.generator.ChunkGenerator;
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index 73513638dd024cb1cdd49c705921f0bcf1935968..f8d4547e171feba53d00ee66cfb9ad542ed207c6 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -233,9 +233,9 @@ public class Main {
+             }
+ 
+             float javaVersion = Float.parseFloat(System.getProperty("java.class.version"));
+-            if (javaVersion > 60.0) {
+-                System.err.println("Unsupported Java detected (" + javaVersion + "). Only up to Java 16 is supported.");
+-                if (!Boolean.getBoolean("Paper.IgnoreJavaVersion")) return; // Paper
++            if (javaVersion < 67.0) {
++                System.err.println("No-no-no, idi naxuy, it's okey?");
++                return;
+             }
+ 
+             try {
+diff --git a/src/main/java/org/bukkit/craftbukkit/block/CraftCreatureSpawner.java b/src/main/java/org/bukkit/craftbukkit/block/CraftCreatureSpawner.java
+index 3d29be926e36b9a5a981eea1f2a1ec54a4c43393..4d39ff1f8afe90e0bb4305cadbabbf9435c17800 100644
+--- a/src/main/java/org/bukkit/craftbukkit/block/CraftCreatureSpawner.java
++++ b/src/main/java/org/bukkit/craftbukkit/block/CraftCreatureSpawner.java
+@@ -10,10 +10,10 @@ import net.minecraft.world.level.block.entity.TileEntityMobSpawner;
+ import org.bukkit.Material;
+ import org.bukkit.block.Block;
+ import org.bukkit.block.CreatureSpawner;
++import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.entity.EntityType;
+ // Paper start
+ import org.bukkit.craftbukkit.inventory.CraftItemStack;
+-import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.ItemStack;
+ // Paper end
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftBoat.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftBoat.java
+index 16799dc565c5ca42d1fdb3122594d9dae21c74e0..c0277f8e859ad022f77562f598bcb768d4ea1bb2 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftBoat.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftBoat.java
+@@ -4,7 +4,7 @@ import net.minecraft.world.entity.vehicle.EntityBoat;
+ import org.bukkit.Material; // Paper
+ import org.bukkit.TreeSpecies;
+ import org.bukkit.craftbukkit.CraftServer;
+-import org.bukkit.craftbukkit.util.CraftMagicNumbers; // Paper
++import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.entity.Boat;
+ import org.bukkit.entity.EntityType;
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftHumanEntity.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftHumanEntity.java
+index 6e28e0247200fbbc470ba317575f0c714f74d5bf..b3c6b111c17a6c352a00dd13751a457485186003 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftHumanEntity.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftHumanEntity.java
+@@ -47,7 +47,6 @@ import org.bukkit.craftbukkit.inventory.CraftInventoryPlayer;
+ import org.bukkit.craftbukkit.inventory.CraftInventoryView;
+ import org.bukkit.craftbukkit.inventory.CraftItemStack;
+ import org.bukkit.craftbukkit.inventory.CraftMerchantCustom;
+-import org.bukkit.craftbukkit.util.CraftChatMessage;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.craftbukkit.util.CraftNamespacedKey;
+ import org.bukkit.entity.HumanEntity;
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+index 9ecad2520740cc1c8f7017eaa935460777d0c191..58e12b2fb9de2ba9fce01533d0c31db455a8a047 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -29,6 +29,17 @@ import java.util.WeakHashMap;
+ import java.util.logging.Level;
+ import java.util.logging.Logger;
+ import javax.annotation.Nullable;
++
++import net.kyori.adventure.audience.Audience;
++import net.kyori.adventure.audience.MessageType;
++import net.kyori.adventure.chat.ChatType;
++import net.kyori.adventure.chat.SignedMessage;
++import net.kyori.adventure.identity.Identity;
++import net.kyori.adventure.text.Component;
++import net.kyori.adventure.text.ComponentLike;
++import net.kyori.adventure.text.serializer.ComponentSerializer;
++import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
++import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+ import net.minecraft.SystemUtils;
+ import net.minecraft.advancements.AdvancementProgress;
+ import net.minecraft.core.BlockPosition;
+@@ -126,7 +137,6 @@ import org.bukkit.entity.EntityType;
+ import org.bukkit.entity.Player;
+ import org.bukkit.event.player.PlayerRegisterChannelEvent;
+ import org.bukkit.event.player.PlayerTeleportEvent;
+-import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
+ import org.bukkit.event.player.PlayerUnregisterChannelEvent;
+ import org.bukkit.inventory.InventoryView.Property;
+ import org.bukkit.inventory.ItemStack;
+@@ -138,6 +148,7 @@ import org.bukkit.plugin.messaging.StandardMessenger;
+ import org.bukkit.scoreboard.Scoreboard;
+ 
+ import net.md_5.bungee.api.chat.BaseComponent; // Spigot
++import org.jetbrains.annotations.NotNull;
+ 
+ @DelegateDeserialization(CraftOfflinePlayer.class)
+ public class CraftPlayer extends CraftHumanEntity implements Player {
+@@ -259,6 +270,14 @@ public class CraftPlayer extends CraftHumanEntity implements Player {
+         }
+     }
+ 
++    @SuppressWarnings("UnstableApiUsage")
++    @Override
++    public void sendMessage(final net.kyori.adventure.identity.Identity identity, final net.kyori.adventure.text.Component message, final net.kyori.adventure.audience.MessageType type) {
++        final PacketPlayOutChat packet = new PacketPlayOutChat(null, type == net.kyori.adventure.audience.MessageType.CHAT ? net.minecraft.network.chat.ChatMessageType.CHAT : net.minecraft.network.chat.ChatMessageType.SYSTEM, identity.uuid());
++        packet.adventure$message = message;
++        this.getHandle().playerConnection.sendPacket(packet);
++    }
++
+     @Override
+     public void sendMessage(UUID sender, String message) {
+         if (!conversationTracker.isConversingModaly()) {
+@@ -2136,13 +2155,6 @@ public class CraftPlayer extends CraftHumanEntity implements Player {
+         this.getHandle().displayName = null;
+     }
+ 
+-    @Override
+-    public void sendMessage(final net.kyori.adventure.identity.Identity identity, final net.kyori.adventure.text.Component message, final net.kyori.adventure.audience.MessageType type) {
+-        final PacketPlayOutChat packet = new PacketPlayOutChat(null, type == net.kyori.adventure.audience.MessageType.CHAT ? net.minecraft.network.chat.ChatMessageType.CHAT : net.minecraft.network.chat.ChatMessageType.SYSTEM, identity.uuid());
+-        packet.adventure$message = message;
+-        this.getHandle().playerConnection.sendPacket(packet);
+-    }
+-
+     @Override
+     public void sendActionBar(final net.kyori.adventure.text.Component message) {
+         final PacketPlayOutTitle packet = new PacketPlayOutTitle(PacketPlayOutTitle.EnumTitleAction.ACTIONBAR, null);
+diff --git a/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java b/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
+index c07ff0cc7cae358c3fd772d24c2944cc92e1acff..41bd6952ae6e119db0d39142ea73655a939069e7 100644
+--- a/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
++++ b/src/main/java/org/bukkit/craftbukkit/event/CraftEventFactory.java
+@@ -2,7 +2,6 @@ package org.bukkit.craftbukkit.event;
+ 
+ import com.google.common.base.Function;
+ import com.google.common.base.Functions;
+-import com.google.common.collect.Lists;
+ import com.mojang.datafixers.util.Either;
+ import io.papermc.paper.event.block.BlockFailedDispenseEvent;
+ import java.net.InetAddress;
+@@ -13,6 +12,8 @@ import java.util.List;
+ import java.util.Map;
+ import java.util.stream.Collectors;
+ import javax.annotation.Nullable;
++
++import net.kyori.adventure.text.Component;
+ import net.minecraft.core.BlockPosition;
+ import net.minecraft.core.EnumDirection;
+ import net.minecraft.network.protocol.game.PacketPlayInCloseWindow;
+@@ -881,7 +882,7 @@ public class CraftEventFactory {
+ 
+     public static PlayerDeathEvent callPlayerDeathEvent(EntityPlayer victim, List<org.bukkit.inventory.ItemStack> drops, net.kyori.adventure.text.Component deathMessage, String stringDeathMessage, boolean keepInventory) { // Paper - Adventure
+         CraftPlayer entity = victim.getBukkitEntity();
+-        PlayerDeathEvent event = new PlayerDeathEvent(entity, drops, victim.getExpReward(), 0, deathMessage, stringDeathMessage); // Paper - Adventure
++        PlayerDeathEvent event = new PlayerDeathEvent(entity, drops, victim.getExpReward(), Component.empty()); // Paper - Adventure
+         event.setKeepInventory(keepInventory);
+         populateFields(victim, event); // Paper - make cancellable
+         org.bukkit.World world = entity.getWorld();
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftItemStack.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftItemStack.java
+index 09d7a86b5f6cffdf6664ad657dd4f8dd8eabdd70..292ed761cd337064037844f7b8cd1449486d2d5c 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftItemStack.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftItemStack.java
+@@ -6,11 +6,9 @@ import java.util.Map;
+ import net.minecraft.nbt.NBTTagCompound;
+ import net.minecraft.nbt.NBTTagList;
+ import net.minecraft.world.item.Item;
+-import net.minecraft.world.item.enchantment.EnchantmentManager;
+ import org.apache.commons.lang.Validate;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.enchantments.CraftEnchantment;
+ import org.bukkit.craftbukkit.util.CraftLegacy;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.craftbukkit.util.CraftNamespacedKey;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBanner.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBanner.java
+index 27e7d7919992a3d1567db8619e67d57b62a3a5d6..96aa4e14b869e3f8026385611d2b100371399915 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBanner.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBanner.java
+@@ -12,8 +12,6 @@ import org.bukkit.Material;
+ import org.bukkit.block.banner.Pattern;
+ import org.bukkit.block.banner.PatternType;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.BannerMeta;
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBlockState.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBlockState.java
+index d003a2e5d910a9198e9eefdd3bfb6d173c57e2ec..55e9b517e054411d9730ffd6c88dbb41e75c7eba 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBlockState.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBlockState.java
+@@ -68,8 +68,6 @@ import org.bukkit.craftbukkit.block.CraftSign;
+ import org.bukkit.craftbukkit.block.CraftSkull;
+ import org.bukkit.craftbukkit.block.CraftSmoker;
+ import org.bukkit.craftbukkit.block.CraftStructureBlock;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.BlockStateMeta;
+ 
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBook.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBook.java
+index bf1b6fa34b32730b493c37d3a0aa69a904c2d2b6..6d80716293177781d76f09764348611a16ecb6a9 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBook.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaBook.java
+@@ -16,13 +16,10 @@ import net.minecraft.network.chat.IChatBaseComponent;
+ import org.apache.commons.lang.Validate;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftChatMessage;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.BookMeta;
+-import org.bukkit.inventory.meta.BookMeta.Generation;
+-import org.checkerframework.checker.nullness.qual.NonNull;
+ 
+ // Spigot start
+ import static org.spigotmc.ValidateUtils.*;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaCrossbow.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaCrossbow.java
+index e9965318d2bd8982557d0c3e687c59b0b1649eb0..b752c9c8b8663f7d8d626346589f68d5ac64b19c 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaCrossbow.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaCrossbow.java
+@@ -11,8 +11,6 @@ import net.minecraft.nbt.NBTTagList;
+ import net.minecraft.world.item.ItemArrow;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.ItemStack;
+ import org.bukkit.inventory.meta.CrossbowMeta;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaFirework.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaFirework.java
+index 4016a9edf1796849ae10f52680e9854e61a381b1..76b5824bdf43014e69312d84c10e776c24f47edf 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaFirework.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaFirework.java
+@@ -14,7 +14,6 @@ import org.bukkit.FireworkEffect;
+ import org.bukkit.FireworkEffect.Type;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey.Specific;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey.Specific.To;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaMap.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaMap.java
+index 2d7ddc62aab2d40806ab126a1bc1ed0b8f4d233c..15b9ec363709c585bc2904b5069cc7c88c140394 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaMap.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaMap.java
+@@ -10,7 +10,6 @@ import org.bukkit.Bukkit;
+ import org.bukkit.Color;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.MapMeta;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaPotion.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaPotion.java
+index df0dda466535f7af41b8fd7f12d7d3a2b56f21b1..117c17345de7b70cefdc626001555a6725e48afc 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaPotion.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaPotion.java
+@@ -12,7 +12,6 @@ import org.apache.commons.lang.Validate;
+ import org.bukkit.Color;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.potion.CraftPotionUtil;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSkull.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSkull.java
+index 6db0d35eba647a0e81ca464fa52dc4a404ddd2ab..2f7ebd9b10dc10b99ad40320c88b69e70595268c 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSkull.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSkull.java
+@@ -15,7 +15,6 @@ import org.bukkit.Material;
+ import org.bukkit.OfflinePlayer;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+ import org.bukkit.craftbukkit.entity.CraftPlayer;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.SkullMeta;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSuspiciousStew.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSuspiciousStew.java
+index 37c4352cf90992010becd3497ffc345079452e1d..18f7dd6e3926582bf38a815be7fc7723aa651f50 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSuspiciousStew.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaSuspiciousStew.java
+@@ -11,8 +11,6 @@ import net.minecraft.nbt.NBTTagList;
+ import org.apache.commons.lang.Validate;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.inventory.meta.SuspiciousStewMeta;
+ import org.bukkit.potion.PotionEffect;
+diff --git a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaTropicalFishBucket.java b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaTropicalFishBucket.java
+index 7b7e4907cd197e16ea5851b91d9b975658d2dbf3..13ac165181d14cebc394602dcb3fec4963c32ce8 100644
+--- a/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaTropicalFishBucket.java
++++ b/src/main/java/org/bukkit/craftbukkit/inventory/CraftMetaTropicalFishBucket.java
+@@ -8,7 +8,6 @@ import org.bukkit.DyeColor;
+ import org.bukkit.Material;
+ import org.bukkit.configuration.serialization.DelegateDeserialization;
+ import org.bukkit.craftbukkit.entity.CraftTropicalFish;
+-import org.bukkit.craftbukkit.inventory.CraftMetaItem.ItemMetaKey;
+ import org.bukkit.craftbukkit.inventory.CraftMetaItem.SerializableMeta;
+ import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.entity.TropicalFish;
+diff --git a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+index bfe4f7ed53620510b52d4f01c5ea2a3f726942d8..f7d5dae8dd81aa597b0ee61563d09f5086428a42 100644
+--- a/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/CraftMagicNumbers.java
+@@ -45,7 +45,6 @@ import org.bukkit.Registry;
+ import org.bukkit.UnsafeValues;
+ import org.bukkit.advancement.Advancement;
+ import org.bukkit.block.data.BlockData;
+-import org.bukkit.craftbukkit.block.CraftBlock;
+ import org.bukkit.craftbukkit.block.data.CraftBlockData;
+ import org.bukkit.craftbukkit.inventory.CraftItemStack;
+ import org.bukkit.craftbukkit.legacy.CraftLegacy;
+@@ -76,11 +75,6 @@ public final class CraftMagicNumbers implements UnsafeValues {
+         return io.papermc.paper.adventure.PaperAdventure.GSON;
+     }
+ 
+-    @Override
+-    public net.kyori.adventure.text.serializer.plain.PlainComponentSerializer plainComponentSerializer() {
+-        return io.papermc.paper.adventure.PaperAdventure.PLAIN;
+-    }
+-
+     @Override
+     public net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer legacyComponentSerializer() {
+         return io.papermc.paper.adventure.PaperAdventure.LEGACY_SECTION_UXRC;
+diff --git a/src/test/java/org/bukkit/PerMaterialTest.java b/src/test/java/org/bukkit/PerMaterialTest.java
+index a777d0d8fba48d2e08395f03d755717bb75b07b1..c3d4b7c9779331a51fc73ac476a94e0e89d7a005 100644
+--- a/src/test/java/org/bukkit/PerMaterialTest.java
++++ b/src/test/java/org/bukkit/PerMaterialTest.java
+@@ -22,7 +22,6 @@ import net.minecraft.world.level.block.state.IBlockData;
+ import net.minecraft.world.phys.MovingObjectPositionBlock;
+ import org.bukkit.craftbukkit.CraftEquipmentSlot;
+ import org.bukkit.craftbukkit.inventory.CraftItemStack;
+-import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.enchantments.EnchantmentTarget;
+ import org.bukkit.inventory.EquipmentSlot;
+ import org.bukkit.inventory.ItemStack;
+diff --git a/src/test/java/org/bukkit/support/DummyServer.java b/src/test/java/org/bukkit/support/DummyServer.java
+index 886e462defb4bd15063e4a1ce04fd7bb0df75b2a..4c1dec5f82fe51349fdccf3f2f70e76a22c693a8 100644
+--- a/src/test/java/org/bukkit/support/DummyServer.java
++++ b/src/test/java/org/bukkit/support/DummyServer.java
+@@ -12,7 +12,6 @@ import org.bukkit.Server;
+ import org.bukkit.craftbukkit.CraftLootTable;
+ import org.bukkit.craftbukkit.block.data.CraftBlockData;
+ import org.bukkit.craftbukkit.inventory.CraftItemFactory;
+-import org.bukkit.craftbukkit.util.CraftMagicNumbers;
+ import org.bukkit.craftbukkit.util.CraftNamespacedKey;
+ import org.bukkit.craftbukkit.util.Versioning;
+ 
